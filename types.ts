@@ -1,26 +1,40 @@
 
 export interface Photo {
   id: string;
-  url: string;
   blob: Blob;
-  senderId: string;
-  senderName: string;
-  timestamp: number;
+  url: string;
   caption?: string;
-  mimeType: string;
+  sender: string;
+  timestamp: number;
+  isFeatured?: boolean;
 }
+
+export type AppView = 'home' | 'gallery' | 'wall' | 'join';
 
 export interface EventSession {
   id: string;
   name: string;
-  hostId: string;
-  startTime: number;
+  hostName: string;
+  isHost: boolean;
 }
 
-export type AppView = 'home' | 'create' | 'join' | 'gallery' | 'wall';
+export interface P2PSignal {
+  type: 'offer' | 'answer';
+  sdp: string;
+}
 
-export interface User {
+export interface P2PChunk {
   id: string;
-  name: string;
-  isHost: boolean;
+  index: number;
+  total: number;
+  data: Uint8Array;
+}
+
+export interface IncomingFile {
+  id: string;
+  mime: string;
+  chunks: (Uint8Array | null)[];
+  receivedCount: number;
+  totalCount: number;
+  sender: string;
 }

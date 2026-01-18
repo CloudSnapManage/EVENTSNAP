@@ -1,6 +1,6 @@
 {
   "name": "EventSnap P2P",
-  "description": "A high-performance, peer-to-peer photo sharing application for events, featuring live photo walls, AI-powered captions, and one-click ZIP downloads without server storage.",
+  "description": "A high-performance, serverless P2P photo sharing app for events with Gemini-powered AI captions and a stunning Midnight Sky glassmorphic theme.",
   "requestFramePermissions": [
     "camera"
   ]
