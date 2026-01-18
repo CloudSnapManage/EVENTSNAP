@@ -33,7 +33,6 @@ const App: React.FC = () => {
   
   const p2p = useRef<P2PManualManager | null>(null);
 
-  // Initialize and check for URL-based join
   useEffect(() => {
     const init = async () => {
       await db.init();
@@ -103,7 +102,7 @@ const App: React.FC = () => {
   const handleJoinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!qrData) {
-      alert("No invitation data found. Please scan the host QR or use the invitation link.");
+      alert("No invitation key found. Use the invitation link or scan a QR code.");
       return;
     }
     
@@ -128,8 +127,8 @@ const App: React.FC = () => {
       setHandshakeStep('showing_answer');
       setShowQR(true);
     } catch (err) {
-      console.error("Join failed:", err);
-      alert("Handshake failed. The invitation key might be invalid.");
+      console.error("Connection failed:", err);
+      alert("Handshake error. The session may have timed out. Refresh both devices.");
       setIsConnecting(false);
     }
   };
@@ -150,7 +149,7 @@ const App: React.FC = () => {
 
   const handleManualSubmit = async () => {
     if (!manualInput) return;
-    const input = manualInput.trim().replace(/-/g, ''); // Clean formatting if present
+    const input = manualInput.trim().replace(/-/g, '');
     setManualInput('');
     await handleScannerOutput(input);
   };
@@ -159,7 +158,6 @@ const App: React.FC = () => {
     setShowScanner(false);
     
     if (data.startsWith('o|')) {
-      // It's an offer
       setQrData(data);
       if (user) {
         const manager = p2p.current || initP2P();
@@ -171,9 +169,8 @@ const App: React.FC = () => {
         setView('join');
       }
     } else if (data.startsWith('a|')) {
-      // It's an answer
       if (!p2p.current) {
-        alert("Session lost. Please refresh and try again.");
+        alert("Session error. Please refresh.");
         return;
       }
       try {
@@ -181,10 +178,10 @@ const App: React.FC = () => {
         setHandshakeStep('connected');
         setShowQR(false);
       } catch (err) {
-        alert("Sync failed. Ensure you scan the Guest's QR code.");
+        alert("Failed to confirm connection. Scan the Guest's response QR.");
       }
     } else {
-      alert("Invalid Code. Ensure it starts with 'o|' or 'a|'.");
+      alert("Unsupported code format.");
     }
   };
 
@@ -192,8 +189,8 @@ const App: React.FC = () => {
     navigator.clipboard.writeText(text).then(() => {
       alert(`${label} copied!`);
     }).catch(err => {
-      console.error("Copy failed", err);
-      alert("Could not copy automatically. Please select text manually.");
+      console.error("Clipboard blocked", err);
+      alert("Please select and copy the text manually.");
     });
   };
 
@@ -246,23 +243,11 @@ const App: React.FC = () => {
     link.click();
   };
 
-  // Format code into chunks of 4 for better readability
   const formattedCode = qrData.match(/.{1,4}/g)?.join('-') || qrData;
+  const inviteUrl = session ? `${window.location.origin}${window.location.pathname}?offer=${encodeURIComponent(qrData)}` : '';
 
   if (showWall) return <PhotoWall photos={photos} onClose={() => setShowWall(false)} />;
-  if (showScanner) return (
-    <QRScanner 
-      onScan={handleScannerOutput} 
-      onClose={() => setShowScanner(false)} 
-      onManual={() => { 
-        setShowScanner(false); 
-        setActiveTab('manual');
-        setShowQR(true); 
-      }} 
-    />
-  );
-
-  const inviteUrl = session ? `${window.location.origin}${window.location.pathname}?offer=${encodeURIComponent(qrData)}` : '';
+  if (showScanner) return <QRScanner onScan={handleScannerOutput} onClose={() => setShowScanner(false)} onManual={() => { setShowScanner(false); setActiveTab('manual'); setShowQR(true); }} />;
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-10 relative">
@@ -279,7 +264,7 @@ const App: React.FC = () => {
                <div className={`w-2 h-2 rounded-full ${p2pStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
                <span className="text-[10px] font-black text-white uppercase tracking-widest">{p2pStatus}</span>
              </div>
-             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 hover:bg-white/10 rounded-xl text-slate-500" title="Sign Out"><ICONS.X className="w-5 h-5" /></button>
+             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 hover:bg-white/10 rounded-xl text-slate-500"><ICONS.X className="w-5 h-5" /></button>
           </div>
         )}
       </header>
@@ -287,20 +272,21 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-7xl mx-auto w-full relative z-10">
         {view === 'home' && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-12">
-            <h2 className="text-6xl md:text-8xl font-black text-white leading-tight tracking-tighter">Private Sync.<br/><span className="text-blue-500">Zero Servers.</span></h2>
+            <h2 className="text-6xl md:text-8xl font-black text-white leading-tight tracking-tighter">Event Sync.<br/><span className="text-blue-500">No Servers.</span></h2>
             <div className="flex flex-col md:flex-row gap-6 w-full max-w-2xl">
               <form onSubmit={handleCreateEvent} className="flex-1 glass-morphism p-8 rounded-[2.5rem] space-y-4">
                 <input required name="eventName" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Event Name" />
-                <input required name="userName" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Your Name (Host)" />
-                <button type="submit" className="w-full py-5 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 uppercase text-sm tracking-widest">Start Album</button>
+                <input required name="userName" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Your Name" />
+                <button type="submit" className="w-full py-5 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 uppercase text-sm tracking-widest">Create Album</button>
               </form>
               <div className="flex-1 flex flex-col gap-4">
                  <button onClick={() => setShowScanner(true)} className="flex-1 glass-morphism rounded-[2.5rem] border border-white/10 flex flex-col items-center justify-center gap-4 hover:bg-white/5 transition-all group p-8">
                    <div className="p-5 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500/20 transition-colors">
                     <ICONS.Share className="w-10 h-10 text-blue-500 group-hover:scale-110 transition-transform" />
                    </div>
-                   <span className="font-black uppercase tracking-widest text-xs text-white/80">Join Event</span>
+                   <span className="font-black uppercase tracking-widest text-xs text-white/80">Join with Camera</span>
                  </button>
+                 <button onClick={() => { setHandshakeStep('scanning_offer'); setShowQR(true); setActiveTab('manual'); }} className="py-4 glass-morphism rounded-2xl border border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Joining from PC?</button>
               </div>
             </div>
           </div>
@@ -312,20 +298,19 @@ const App: React.FC = () => {
               <ICONS.Users className="w-16 h-16 text-blue-500 mx-auto" />
             </div>
             <div>
-              <h2 className="text-4xl font-black text-white">Guest Profile</h2>
-              <p className="text-slate-500 font-bold mt-2 uppercase text-[10px] tracking-widest">Invite Code Loaded Successfully</p>
+              <h2 className="text-4xl font-black text-white">Join Event</h2>
+              <p className="text-slate-500 font-bold mt-2 uppercase text-[10px] tracking-widest">Invite Key Detected</p>
             </div>
             <form onSubmit={handleJoinSubmit} className="w-full max-w-md glass-morphism p-8 rounded-[2.5rem] space-y-4">
-               <input required name="userName" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Enter Your Name" autoFocus />
+               <input required name="userName" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Your Display Name" autoFocus />
                <button 
                  type="submit" 
                  disabled={isConnecting}
                  className={`w-full py-5 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-500 transition-all uppercase text-sm tracking-widest shadow-xl shadow-blue-500/20 ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}`}
                >
-                 {isConnecting ? 'Syncing...' : 'Connect to Host'}
+                 {isConnecting ? 'Syncing P2P...' : 'Connect Now'}
                </button>
             </form>
-            <button onClick={() => setView('home')} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Cancel Connection</button>
           </div>
         )}
 
@@ -333,13 +318,13 @@ const App: React.FC = () => {
           <div className="space-y-8 pb-48">
             <div className="sticky top-6 z-40 p-4 glass-morphism rounded-3xl flex items-center justify-between border border-white/10 shadow-2xl">
                <div className="flex flex-col ml-2">
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">P2P Album</span>
+                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Session</span>
                  <span className="text-xl font-black text-white tracking-tight">{session?.name}</span>
                </div>
                <div className="flex gap-2">
-                 <button onClick={() => setShowWall(true)} className="px-6 py-3 bg-white/5 rounded-xl text-[10px] font-black text-white hover:bg-white/10 uppercase tracking-widest">Live Wall</button>
+                 <button onClick={() => setShowWall(true)} className="px-6 py-3 bg-white/5 rounded-xl text-[10px] font-black text-white hover:bg-white/10 uppercase tracking-widest">TV Wall</button>
                  <button onClick={() => { setHandshakeStep(user?.isHost ? 'showing_offer' : 'showing_answer'); setShowQR(true); }} className="px-6 py-3 bg-blue-600 rounded-xl text-[10px] font-black text-white uppercase tracking-widest">Sync Keys</button>
-                 <button onClick={downloadAll} className="p-3 bg-white/10 rounded-xl text-white hover:bg-white/20"><ICONS.Download className="w-4 h-4" /></button>
+                 <button onClick={downloadAll} className="p-3 bg-white/10 rounded-xl text-white hover:bg-white/20" title="Download All"><ICONS.Download className="w-4 h-4" /></button>
                </div>
             </div>
 
@@ -348,11 +333,11 @@ const App: React.FC = () => {
                  <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 animate-pulse border border-white/5">
                   <ICONS.Camera className="w-10 h-10 opacity-20" />
                  </div>
-                 <p className="font-black uppercase tracking-[0.2em] text-[10px]">Empty Album</p>
+                 <p className="font-black uppercase tracking-[0.2em] text-[10px]">No photos yet</p>
                  {p2pStatus !== 'connected' && (
                    <div className="flex flex-col items-center gap-2 mt-4">
-                     <p className="text-[10px] text-blue-500/30 uppercase font-black">Direct Connection Required</p>
-                     <button onClick={() => { setHandshakeStep(user?.isHost ? 'showing_offer' : 'showing_answer'); setShowQR(true); }} className="text-[9px] font-black text-blue-500 underline underline-offset-4 uppercase tracking-widest">Open Sync Portal</button>
+                     <p className="text-[10px] text-blue-500/30 uppercase font-black italic">Awaiting Direct Handshake</p>
+                     <button onClick={() => { setHandshakeStep(user?.isHost ? 'showing_offer' : 'showing_answer'); setShowQR(true); }} className="text-[9px] font-black text-blue-500 underline underline-offset-4 uppercase tracking-widest">Open Connection Center</button>
                    </div>
                  )}
                </div>
@@ -365,8 +350,8 @@ const App: React.FC = () => {
             )}
 
             <div className="fixed bottom-10 left-0 right-0 z-50 flex justify-center">
-              <label className={`cursor-pointer bg-white text-black px-16 py-8 rounded-full font-black text-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all ${isUploading ? 'opacity-50 pointer-events-none animate-pulse' : ''}`}>
-                {isUploading ? 'BROADCASTING...' : 'CAPTURE MOMENT'}
+              <label className={`cursor-pointer bg-white text-black px-16 py-8 rounded-full font-black text-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                {isUploading ? 'UPLOADING...' : 'SNAP & SYNC'}
                 <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleUpload} disabled={isUploading} />
               </label>
             </div>
@@ -377,13 +362,9 @@ const App: React.FC = () => {
       {showQR && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl" onClick={() => setShowQR(false)}>
            <div className="bg-white p-8 md:p-10 rounded-[3rem] text-center space-y-6 w-full max-w-lg animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-             <div>
-               <h4 className="text-2xl font-black text-black tracking-tight">
-                 {handshakeStep === 'showing_offer' ? 'Invite Your Friends' : 'Sync Step 2'}
-               </h4>
-               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-2">
-                 Secure Peer Handshake
-               </p>
+             <div className="space-y-1">
+               <h4 className="text-2xl font-black text-black tracking-tight uppercase">Connection Center</h4>
+               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Secure P2P Handshake</p>
              </div>
 
              <div className="flex bg-slate-100 p-1 rounded-2xl">
@@ -393,7 +374,7 @@ const App: React.FC = () => {
                   onClick={() => setActiveTab(m)}
                   className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === m ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
                  >
-                   {m === 'manual' ? 'Sync Key' : m === 'link' ? 'Invite Link' : 'QR Scan'}
+                   {m === 'qr' ? 'Camera' : m === 'link' ? 'Invite' : 'Manual Key'}
                  </button>
                ))}
              </div>
@@ -408,11 +389,11 @@ const App: React.FC = () => {
                             <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Generating Key...</span>
                         </div>
                       ) : (
-                        qrDataUrl ? <img src={qrDataUrl} className="w-full h-full object-contain image-render-pixel" alt="Handshake QR" /> : <p className="text-xs text-slate-400">Loading...</p>
+                        qrDataUrl ? <img src={qrDataUrl} className="w-full h-full object-contain image-render-pixel" alt="Handshake QR" /> : <p className="text-xs text-slate-400">Ready</p>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">
-                      {handshakeStep === 'showing_offer' ? 'Guests scan this code' : 'Host scans this code'}
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      {handshakeStep === 'showing_offer' ? 'Friends scan this' : 'Show to the Host'}
                     </p>
                  </div>
                )}
@@ -421,8 +402,8 @@ const App: React.FC = () => {
                  <div className="space-y-6 py-8">
                     <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
                       <ICONS.Share className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                      <p className="text-sm font-bold text-slate-600 leading-relaxed mb-6">Send this link to someone on another device (PC, Tablet, Phone). It pre-loads the session.</p>
-                      <button onClick={() => copyToClipboard(inviteUrl, 'Invite Link')} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-blue-500/20">Copy Invitation Link</button>
+                      <p className="text-sm font-bold text-slate-600 leading-relaxed mb-6">Best for PC/Mobile bridge. Send this link to your phone or computer to join instantly.</p>
+                      <button onClick={() => copyToClipboard(inviteUrl, 'Invite Link')} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-blue-500/20 active:translate-y-px">Copy Sync Link</button>
                     </div>
                  </div>
                )}
@@ -430,10 +411,10 @@ const App: React.FC = () => {
                {activeTab === 'manual' && (
                  <div className="space-y-4">
                     <div className="text-left">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Your Sync Key (Copy this)</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Your Device Key</label>
                       <div className="flex gap-2">
                         <input readOnly value={formattedCode} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-mono overflow-ellipsis" />
-                        <button onClick={() => copyToClipboard(qrData, 'Sync Key')} className="p-3 bg-slate-900 text-white rounded-xl active:scale-95 transition-transform"><ICONS.Check className="w-4 h-4" /></button>
+                        <button onClick={() => copyToClipboard(qrData, 'Device Key')} className="p-3 bg-slate-900 text-white rounded-xl"><ICONS.Check className="w-4 h-4" /></button>
                       </div>
                     </div>
                     
@@ -443,22 +424,21 @@ const App: React.FC = () => {
                         value={manualInput}
                         onChange={e => setManualInput(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-mono h-24 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Paste key from other device..."
+                        placeholder="Paste key from other device here..."
                       />
                     </div>
-                    <button onClick={handleManualSubmit} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:translate-y-px">Complete Sync</button>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">Manual keys bridge devices when cameras aren't available</p>
+                    <button onClick={handleManualSubmit} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-transform">Complete Sync</button>
                  </div>
                )}
              </div>
 
              <div className="space-y-3 pt-4 border-t border-slate-100">
                 {handshakeStep === 'showing_offer' && (
-                  <button onClick={() => { setShowScanner(true); setShowQR(false); }} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-xl shadow-blue-500/20 active:scale-[0.98] transition-all">
+                  <button onClick={() => { setShowScanner(true); setShowQR(false); }} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-xl shadow-blue-500/20 active:scale-95 transition-transform">
                     Next: Scan Guest Response
                   </button>
                 )}
-                <button onClick={() => setShowQR(false)} className="w-full py-5 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs hover:bg-slate-200 transition-colors">Dismiss</button>
+                <button onClick={() => setShowQR(false)} className="w-full py-5 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-xs">Dismiss</button>
              </div>
            </div>
         </div>
