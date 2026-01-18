@@ -1,0 +1,66 @@
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Application
+        run: |
+          # Create distribution directory
+          mkdir -p dist
+          
+          # Use esbuild to bundle index.tsx. 
+          # We mark React and others as external so they are handled by the browser's importmap.
+          # We inject the API key secret into the code.
+          npx esbuild index.tsx \
+            --bundle \
+            --outfile=dist/index.js \
+            --format=esm \
+            --minify \
+            --external:react \
+            --external:react-dom \
+            --external:react-dom/client \
+            --external:react/jsx-runtime \
+            --external:@google/genai \
+            --external:jszip \
+            --external:qrcode \
+            --external:jsqr \
+            --define:process.env.API_KEY=\"${{ secrets.GEMINI_API_KEY }}\"
+
+          # Prepare index.html for production
+          cp index.html dist/
+          cp metadata.json dist/ || true
+          
+          # Ensure index.html references the bundled index.js
+          # We add the script tag if it's missing, or update it if it points to index.tsx
+          if grep -q "index.tsx" dist/index.html; then
+            sed -i 's/index.tsx/index.js/g' dist/index.html
+          else
+            sed -i '/<\/body>/i <script type="module" src="./index.js"></script>' dist/index.html
+          fi
+
+      - name: Deploy to GH Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
